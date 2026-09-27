@@ -1,32 +1,64 @@
 
 import os
+import time
+import requests
 import logging
-from telegram import Update
-from telegram.ext import ApplicationBuilder, ContextTypes, CommandHandler
+from telegram import Bot
 
 # Konfigurimi i logimit
 logging.basicConfig(
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    format='%(asctime)s - %(levelname)s - %(message)s',
     level=logging.INFO
 )
 
-# Funksioni per komanden /start
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_name = update.effective_user.first_name
-    await update.message.reply_text(
-        f"Përshëndetje {user_name}! Mirë se erdhe te boti ynë. "
-        "Ky bot funksionon 24/7 për të menaxhuar kanalin dhe pagesat."
-    )
+# Konfigurimet e Telegramit (merren nga Environment Variables te Render ose vendosen ketu)
+TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN", "VENDOS_TOKEN_E_BOT_FATHER_KETU")
+CHAT_ID = os.getenv("CHAT_ID", "VENDOS_CHAT_ID_KETU")
 
-if __name__ == '__main__':
-    # Vendos Token-in e BotFather ketu ose ne Environment Variables
-    TOKEN = "VENDOS_TOKEN_E_BOT_FATHER_KETU"
+bot = Bot(token=TELEGRAM_TOKEN)
+
+def get_odds_data():
+    """
+    Funksioni ku lidhesh me burimin e kuotave (Pinnacle dhe Bet365).
+    Këtu mund të vendosësh logjikën për të marrë të dhënat në kohë reale.
+    """
+    # Shembull simulimi i marrjes së kuotave
+    pinnacle_odd = 1.95
+    bet365_odd = 1.90
     
-    application = ApplicationBuilder().token(TOKEN).build()
+    return pinnacle_odd, bet365_odd
+
+def check_and_alert():
+    pinnacle_old = None
+    bet365_old = None
     
-    # Shto komandën /start
-    start_handler = CommandHandler('start', start)
-    application.add_handler(start_handler)
+    logging.info("Monitorimi i kuotave u nis...")
     
-    print("Boti po niset...")
-    application.run_polling()
+    while True:
+        try:
+            pinnacle_current, bet365_current = get_odds_data()
+            
+            # Krahasojme nese ka ndryshim te kuotave
+            if pinnacle_current != pinnacle_old or bet365_current != bet365_old:
+                message = (
+                    f"🚨 **Lëvizje Kuotash e Identifikuar!**\n\n"
+                    f"🔴 **Pinnacle:** {pinnacle_current}\n"
+                    f"🔵 **Bet365:** {bet365_current}\n"
+                    f"⚡ Pinnacle ka lëvizur më shpejt!"
+                )
+                
+                # Dërgo mesazhin në Telegram
+                bot.send_message(chat_id=CHAT_ID, text=message, parse_mode="Markdown")
+                logging.info("Njoftimi u dërgua në Telegram!")
+                
+                pinnacle_old = pinnacle_current
+                bet365_old = bet365_current
+                
+        except Exception as e:
+            logging.error(f"Gabim gjatë kontrollit të kuotave: {e}")
+            
+        # Kontrollo çdo 10 sekonda
+        time.sleep(10)
+
+if __name__ == "__main__":
+    check_and_alert()
