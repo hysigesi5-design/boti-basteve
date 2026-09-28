@@ -1,64 +1,55 @@
-
-import os
 import time
 import requests
-import logging
-from telegram import Bot
+from datetime import datetime, timezone, timedelta
 
-# Konfigurimi i logimit
-logging.basicConfig(
-    format='%(asctime)s - %(levelname)s - %(message)s',
-    level=logging.INFO
-)
+TELEGRAM_TOKEN = "8836301007:AAF6gqPbAb1BImjUpafalu7IlGyQgreJRfA"
+CHAT_ID = "6432339063"
 
-# Konfigurimet e Telegramit (merren nga Environment Variables te Render ose vendosen ketu)
-TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN", "VENDOS_TOKEN_E_BOT_FATHER_KETU")
-CHAT_ID = os.getenv("CHAT_ID", "VENDOS_CHAT_ID_KETU")
+def dergo_sinjalizimin(mesazhi):
+    url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
+    payload = {
+        "chat_id": CHAT_ID,
+        "text": mesazhi,
+        "parse_mode": "Markdown"
+    }
+    try:
+        requests.post(url, json=payload)
+    except Exception as e:
+        print(f"Gabim në Telegram: {e}")
 
-bot = Bot(token=TELEGRAM_TOKEN)
-
-def get_odds_data():
-    """
-    Funksioni ku lidhesh me burimin e kuotave (Pinnacle dhe Bet365).
-    Këtu mund të vendosësh logjikën për të marrë të dhënat në kohë reale.
-    """
-    # Shembull simulimi i marrjes së kuotave
-    pinnacle_odd = 1.95
-    bet365_odd = 1.90
+def kontrollo_ndeshjet_72_oret():
+    koha_tani = datetime.now(timezone.utc).replace(tzinfo=None)
+    kufiri_72_ore = koha_tani + timedelta(hours=72)
     
-    return pinnacle_odd, bet365_odd
+    ndeshjet_e_dites = [
+        {"ndeshje": "Milan - Inter", "pinnacle": 1.70, "bet365": 1.95, "koha": (koha_tani + timedelta(hours=10)).strftime("%Y-%m-%dT%H:%M:%S")},
+        {"ndeshje": "Juventus - Torino", "pinnacle": 1.50, "bet365": 1.55, "koha": (koha_tani + timedelta(hours=50)).strftime("%Y-%m-%dT%H:%M:%S")}
+    ]
+    
+    print(f"[{datetime.now()}] Po kontrollohet programi për ndeshjet brenda 72 orëve...")
 
-def check_and_alert():
-    pinnacle_old = None
-    bet365_old = None
-    
-    logging.info("Monitorimi i kuotave u nis...")
-    
-    while True:
-        try:
-            pinnacle_current, bet365_current = get_odds_data()
+    for match in ndeshjet_e_dites:
+        koha_str = match["koha"].split(".")[0].replace("Z", "")
+        koha_ndeshjes = datetime.strptime(koha_str, "%Y-%m-%dT%H:%M:%S")
+        
+        if koha_tani <= koha_ndeshjes <= kufiri_72_ore:
+            emri = match["ndeshje"]
+            pin = match["pinnacle"]
+            b365 = match["bet365"]
+            diferenca = b365 - pin
             
-            # Krahasojme nese ka ndryshim te kuotave
-            if pinnacle_current != pinnacle_old or bet365_current != bet365_old:
-                message = (
-                    f"🚨 **Lëvizje Kuotash e Identifikuar!**\n\n"
-                    f"🔴 **Pinnacle:** {pinnacle_current}\n"
-                    f"🔵 **Bet365:** {bet365_current}\n"
-                    f"⚡ Pinnacle ka lëvizur më shpejt!"
+            if diferenca >= 0.15:
+                mesazhi = (
+                    f"🚨 *ALARM: DROPPING ODDS (72H)* 🚨\n\n"
+                    f"⚽ Ndeshja: *{emri}*\n"
+                    f"📉 Pinnacle (Ulur): *{pin}*\n"
+                    f"📈 Bet365 (Lart): *{b365}*\n"
+                    f"💡 Diferenca: *+{diferenca:.2f}*"
                 )
-                
-                # Dërgo mesazhin në Telegram
-                bot.send_message(chat_id=CHAT_ID, text=message, parse_mode="Markdown")
-                logging.info("Njoftimi u dërgua në Telegram!")
-                
-                pinnacle_old = pinnacle_current
-                bet365_old = bet365_current
-                
-        except Exception as e:
-            logging.error(f"Gabim gjatë kontrollit të kuotave: {e}")
-            
-        # Kontrollo çdo 10 sekonda
-        time.sleep(10)
+                dergo_sinjalizimin(mesazhi)
 
 if __name__ == "__main__":
-    check_and_alert()
+    print("Boti u nis në Cloud dhe po punon 24/7...")
+    while True:
+        kontrollo_ndeshjet_72_oret()
+        time.sleep(1800)  # Kontrollon çdo 30 minuta
